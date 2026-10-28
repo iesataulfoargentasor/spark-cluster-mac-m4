@@ -1,0 +1,96 @@
+name: spark-sbd-m4
+x-common: &common
+  image: spark-sbd-m4:4.0.1
+  platform: linux/arm64
+  build:
+    context: .
+    args:
+      LOCAL_UID: "${LOCAL_UID:-501}"
+      LOCAL_GID: "${LOCAL_GID:-20}"
+  user: "${LOCAL_UID:-501}:${LOCAL_GID:-20}"
+  init: true
+  volumes:
+    - ./workspace:/workspace
+  networks: [spark-net]
+  restart: "no"
+
+services:
+  spark-master:
+    <<: *common
+    profiles: [spark, spark-single]
+    hostname: spark-master
+    entrypoint: [/opt/spark/bin/spark-class]
+    command: [org.apache.spark.deploy.master.Master, --host, spark-master, --port, "7077", --webui-port, "8080"]
+    ports:
+      - "127.0.0.1:${MASTER_UI_PORT:-8080}:8080"
+    mem_limit: 1g
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8080/json/', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 36
+      start_period: 30s
+
+  spark-worker-1:
+    <<: *common
+    profiles: [spark, spark-single]
+    hostname: spark-worker-1
+    entrypoint: [/opt/spark/bin/spark-class]
+    command: [org.apache.spark.deploy.worker.Worker, --host, spark-worker-1, --cores, "2", --memory, 2g, --webui-port, "8081", --work-dir, /tmp/spark-work, "spark://spark-master:7077"]
+    depends_on:
+      spark-master: {condition: service_healthy}
+    ports:
+      - "127.0.0.1:${WORKER1_UI_PORT:-8081}:8081"
+    mem_limit: 4g
+    cpus: 2
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8081/json/', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 36
+      start_period: 30s
+
+  spark-worker-2:
+    <<: *common
+    profiles: [spark]
+    hostname: spark-worker-2
+    entrypoint: [/opt/spark/bin/spark-class]
+    command: [org.apache.spark.deploy.worker.Worker, --host, spark-worker-2, --cores, "2", --memory, 2g, --webui-port, "8081", --work-dir, /tmp/spark-work, "spark://spark-master:7077"]
+    depends_on:
+      spark-master: {condition: service_healthy}
+    ports:
+      - "127.0.0.1:${WORKER2_UI_PORT:-8082}:8081"
+    mem_limit: 4g
+    cpus: 2
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8081/json/', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 36
+      start_period: 30s
+
+  jupyter:
+    <<: *common
+    profiles: [spark, spark-single]
+    hostname: jupyter
+    entrypoint: [/opt/venv/bin/jupyter]
+    command: [lab, --ip=0.0.0.0, --port=8888, --no-browser, --ServerApp.root_dir=/workspace, "--IdentityProvider.token=${JUPYTER_TOKEN:-sbd-spark}"]
+    environment:
+      HOME: /tmp/alumno
+    depends_on:
+      spark-master: {condition: service_healthy}
+      spark-worker-1: {condition: service_healthy}
+    ports:
+      - "127.0.0.1:${JUPYTER_PORT:-8888}:8888"
+      - "127.0.0.1:${SPARK_UI_PORT:-4040}:4040"
+    mem_limit: 2g
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8888/login', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 36
+      start_period: 30s
+
+networks:
+  spark-net:
+    driver: bridge

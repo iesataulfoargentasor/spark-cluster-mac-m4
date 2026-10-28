@@ -1,0 +1,148 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Spark · MacBook Air M4 · 24 GB</title><style>body{margin:0;background:#f4f7fb;color:#18283d;font:17px/1.65 system-ui,sans-serif}main{max-width:1000px;margin:auto;padding:40px 24px 80px}h1{font-size:2.3rem;line-height:1.2}h2{margin-top:2.5em;border-bottom:2px solid #d7e3f0;padding-bottom:.3em}h3{margin-top:1.8em}a{color:#005ca9}pre{background:#142638;color:#eff8ff;padding:20px;border-radius:10px;overflow:auto;line-height:1.5}code{font-family:ui-monospace,monospace}p code,li code{background:#e5edf5;padding:.1em .3em;border-radius:4px}table{display:block;overflow:auto;border-collapse:collapse;margin:20px 0}td,th{padding:12px;border:1px solid #cbd8e6;text-align:left}th{background:#e5edf5}nav{background:white;border:1px solid #cbd8e6;border-radius:12px;padding:18px 24px}.notice{background:#fff3d4;padding:16px 22px;border-left:5px solid #a46b00;border-radius:5px}header{background:#142638;color:white;padding:20px 24px}header a{color:#afe1ff}footer{margin-top:40px;font-size:.9rem}@media(max-width:600px){main{padding:24px 16px}h1{font-size:1.8rem}}</style></head><body><header>IES Ataúlfo Argenta · SBD / IABD · <a href="https://github.com/iesataulfoargentasor/spark-cluster-mac-m4">Repositorio y archivos</a></header><main><div class="notice"><strong>Preparado para Apple Silicon.</strong> La configuración y la disponibilidad ARM64 están verificadas. La ejecución nativa en tu Mac M4 sigue pendiente: completa la prueba del apartado 5.</div><nav aria-label="Índice"><strong>En esta guía</strong><div class="toc">
+<ul>
+<li><a href="#spark-en-macbook-air-m4-24-gb">Spark en MacBook Air M4 · 24 GB</a><ul>
+<li><a href="#que-vas-a-montar">Qué vas a montar</a></li>
+<li><a href="#1-preparar-docker-desktop">1. Preparar Docker Desktop</a></li>
+<li><a href="#2-preparar-la-imagen-una-vez">2. Preparar la imagen una vez</a></li>
+<li><a href="#3-arrancar">3. Arrancar</a></li>
+<li><a href="#4-abrir-las-interfaces">4. Abrir las interfaces</a></li>
+<li><a href="#5-comprobar-arm64-y-el-cluster">5. Comprobar ARM64 y el clúster</a></li>
+<li><a href="#6-trabajar-con-el-cuaderno">6. Trabajar con el cuaderno</a></li>
+<li><a href="#7-parar-y-volver-a-trabajar">7. Parar y volver a trabajar</a></li>
+<li><a href="#8-utilizarlo-sin-internet">8. Utilizarlo sin Internet</a></li>
+<li><a href="#9-si-aparece-un-error">9. Si aparece un error</a></li>
+<li><a href="#validacion-y-procedencia">Validación y procedencia</a></li>
+<li><a href="#actualizar-una-copia-existente">Actualizar una copia existente</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav><h1 id="spark-en-macbook-air-m4-24-gb">Spark en MacBook Air M4 · 24 GB</h1>
+<p>Stack docente basado en <a href="https://iesataulfoargentasor.github.io/spark-cluster-docker-sbd/">Spark SBD del IES Ataúlfo Argenta</a>, adaptado a Apple Silicon. Incluye Spark 4.0.1, Java 17, Python y JupyterLab 4.4.9 en una imagen común para todos los servicios.</p>
+<p><strong><a href="https://iesataulfoargentasor.github.io/spark-cluster-mac-m4/">Guía web paso a paso</a></strong> · <strong><a href="https://github.com/iesataulfoargentasor/spark-cluster-mac-m4/archive/refs/heads/main.zip">Descargar ZIP</a></strong></p>
+<h2 id="que-vas-a-montar">Qué vas a montar</h2>
+<pre><code class="language-text">MacBook Air M4 (24 GB)
+└── Docker Desktop: máquina Linux ARM64
+    ├── spark-master: asigna recursos
+    ├── spark-worker-1: 2 núcleos y 2 GiB para Spark
+    ├── spark-worker-2: 2 núcleos y 2 GiB para Spark
+    └── jupyter: cuadernos y driver de la aplicación
+        Todos comparten /workspace
+</code></pre>
+<p>Un worker aloja un executor con 2 núcleos y 2 GiB de heap. Con dos workers hay hasta cuatro tareas simultáneas. Los contenedores de cada worker tienen un límite de 4 GiB para dejar espacio a Python, la JVM y el servicio; no son 4 GiB de heap Spark. Master y Jupyter tienen límites de 1 y 2 GiB. Son límites, no memoria reservada continuamente.</p>
+<p>La plataforma se fija en <code>linux/arm64</code>: en el M4 no requiere emular Intel. Spark utiliza la CPU; esta práctica no utiliza la GPU ni el Neural Engine. Todos los nodos comparten el mismo portátil: no es un clúster de máquinas físicas independientes.</p>
+<h2 id="1-preparar-docker-desktop">1. Preparar Docker Desktop</h2>
+<ol>
+<li>Instala <a href="https://docs.docker.com/desktop/setup/install/mac-install/">Docker Desktop para Mac con Apple Silicon</a> y ábrelo.</li>
+<li>En Settings → Resources, toma como punto de partida <strong>12 GB de RAM y 6 CPU</strong> para Docker. Deja el resto de la memoria para macOS y tus aplicaciones. Si tu versión permite elegir el sistema de carpetas compartidas, utiliza VirtioFS.</li>
+<li>Reserva unos <strong>10 GB libres</strong> para imagen, caché y prácticas pequeñas. La primera preparación necesita Internet.</li>
+<li>Abre Terminal. Si tienes Git, descarga el proyecto con estos comandos. Si macOS pide instalar las herramientas de línea de comandos de Apple al ejecutar Git, acepta la instalación y repite después.</li>
+</ol>
+<pre><code class="language-bash">mkdir -p ~/Proyectos
+cd ~/Proyectos
+git clone https://github.com/iesataulfoargentasor/spark-cluster-mac-m4.git
+cd spark-cluster-mac-m4
+docker version
+docker compose version
+</code></pre>
+<p>También puedes descargar el ZIP desde el enlace inicial, descomprimirlo y abrir Terminal en la carpeta que contiene <code>compose.yaml</code>. La carpeta del ZIP puede llamarse <code>spark-cluster-mac-m4-main</code>; usa su nombre real. Evita iCloud Drive y otras carpetas sincronizadas. Ejecuta todos los comandos siguientes dentro de la carpeta del proyecto.</p>
+<p>Docker debe mostrar Client y Server. Necesitas Compose 2.20 o posterior. No hace falta instalar Python, Java o Spark en macOS. Docker Desktop ejecuta contenedores Linux en su máquina virtual; ARM64 evita la emulación de instrucciones Intel.</p>
+<h2 id="2-preparar-la-imagen-una-vez">2. Preparar la imagen una vez</h2>
+<pre><code class="language-bash">bash preparar.sh
+</code></pre>
+<p>El asistente crea <code>.env</code> con tu UID/GID, conserva un <code>.env</code> existente y construye la imagen. No necesita <code>sudo</code>. Puede tardar varios minutos. Si ya tienes <code>.env</code>, revisa que <code>LOCAL_UID</code> y <code>LOCAL_GID</code> coincidan con <code>id -u</code> e <code>id -g</code>.</p>
+<p>La imagen oficial de Spark está fijada por versión y digest del índice multiplataforma. Docker selecciona ARM64 al construir. Las dependencias transitivas de Jupyter y los paquetes del sistema no están completamente fijados.</p>
+<h2 id="3-arrancar">3. Arrancar</h2>
+<p>Perfil recomendado para tus 24 GB:</p>
+<pre><code class="language-bash">docker compose --profile spark up -d --wait --wait-timeout 300
+docker compose --profile &quot;*&quot; ps
+</code></pre>
+<p>Arranca master, dos workers y Jupyter. Para trabajar con menos consumo puedes elegir el perfil <code>spark-single</code>, con un solo worker. Para cambiar entre perfiles, primero ejecuta <code>docker compose --profile "*" down</code> y luego el <code>up</code> del perfil elegido. Los archivos de <code>workspace</code> se conservan.</p>
+<h2 id="4-abrir-las-interfaces">4. Abrir las interfaces</h2>
+<table>
+<thead>
+<tr>
+<th>Interfaz</th>
+<th>Dirección</th>
+<th>Uso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JupyterLab</td>
+<td>http://localhost:8888</td>
+<td>Token inicial: <code>sbd-spark</code></td>
+</tr>
+<tr>
+<td>Master</td>
+<td>http://localhost:8080</td>
+<td>Debe mostrar dos workers ALIVE</td>
+</tr>
+<tr>
+<td>Worker 1</td>
+<td>http://localhost:8081</td>
+<td>Executor y recursos</td>
+</tr>
+<tr>
+<td>Worker 2</td>
+<td>http://localhost:8082</td>
+<td>Sólo en perfil completo</td>
+</tr>
+<tr>
+<td>Spark UI</td>
+<td>http://localhost:4040</td>
+<td>Sólo mientras exista una aplicación activa</td>
+</tr>
+</tbody>
+</table>
+<p>Si esos puertos están ocupados por el stack anterior, cambia sus valores en <code>.env</code> y repite <code>up</code>. No cambies los puertos internos ni los nombres de servicio. Las interfaces se publican únicamente en tu propio equipo (127.0.0.1).</p>
+<h2 id="5-comprobar-arm64-y-el-cluster">5. Comprobar ARM64 y el clúster</h2>
+<p>Antes de abrir sesiones en los cuadernos:</p>
+<pre><code class="language-bash">docker compose exec -T jupyter python /workspace/comprobar_cluster.py --workers 2
+</code></pre>
+<p>En modo ligero, usa <code>--workers 1</code>. La prueba exige arquitectura <code>aarch64</code> tanto en el driver como en los procesos Python de los executors. Comprueba los workers, ejecuta tareas en todos ellos, suma el CSV y escribe y recupera Parquet. El resultado debe incluir <code>"resultado": "OK"</code>, <code>"arquitectura": "aarch64"</code>, y ventas ES=30, FR=12.</p>
+<p>En el perfil completo deben aparecer <code>spark-worker-1</code> y <code>spark-worker-2</code>. Esta prueba ocupa los cuatro núcleos del clúster simultáneamente; cierra cualquier otra sesión Spark antes de ejecutarla.</p>
+<h2 id="6-trabajar-con-el-cuaderno">6. Trabajar con el cuaderno</h2>
+<p>Abre <code>notebooks/01_Primer_cluster.ipynb</code> en Jupyter, guarda una copia y ejecuta las celdas en orden. La sesión ya utiliza <code>spark://spark-master:7077</code>. No añadas <code>.master("local[*]")</code>: dejarías de utilizar los workers.</p>
+<p>El driver está en <code>jupyter</code>, desde donde los executors pueden contactar con él. Ejecuta Python desde ese contenedor, no desde una instalación de Python del Mac. Usa rutas <code>/workspace/...</code>, no <code>/Users/...</code>.</p>
+<p>Los cuadernos, CSV y resultados se guardan en <code>workspace/</code> del Mac. Los cuatro contenedores ven esa carpeta en la misma ruta. Cierra la aplicación con <code>spark.stop()</code> antes de abrir otra; la configuración se ha dimensionado para una aplicación a la vez.</p>
+<h2 id="7-parar-y-volver-a-trabajar">7. Parar y volver a trabajar</h2>
+<pre><code class="language-bash">docker compose --profile &quot;*&quot; stop
+</code></pre>
+<p>Para reanudar:</p>
+<pre><code class="language-bash">docker compose --profile spark up -d --wait --wait-timeout 300
+</code></pre>
+<p>Para retirar contenedores y red, conservando los archivos:</p>
+<pre><code class="language-bash">docker compose --profile &quot;*&quot; down
+</code></pre>
+<p>Después de reiniciar tendrás que crear otra SparkSession. La memoria de la aplicación no se conserva. Al terminar las prácticas, parar el stack reduce consumo y calentamiento del portátil.</p>
+<h2 id="8-utilizarlo-sin-internet">8. Utilizarlo sin Internet</h2>
+<p>Construye la imagen y completa la comprobación con conexión antes de desconectarte. Después:</p>
+<pre><code class="language-bash">docker compose --profile spark up -d --no-build --pull never --wait --wait-timeout 300
+</code></pre>
+<p>El cuaderno y el CSV incluidos son locales. Otros ejercicios que descarguen paquetes, datos o conectores externos necesitarán preparación adicional. No copies una imagen Intel del otro ordenador: construye la imagen ARM64 en el Mac.</p>
+<h2 id="9-si-aparece-un-error">9. Si aparece un error</h2>
+<pre><code class="language-bash">docker compose --profile &quot;*&quot; ps -a
+docker compose logs --tail 100 spark-master spark-worker-1 spark-worker-2 jupyter
+</code></pre>
+<ul>
+<li><strong>Docker no responde:</strong> abre Docker Desktop y comprueba que <code>docker version</code> incluye Server.</li>
+<li><strong>No puedes guardar o aparece Mounts denied:</strong> comprueba que la carpeta esté compartida con Docker y sea escribible por tu usuario. Revisa <code>.env</code>; si cambias UID/GID, reconstruye con <code>docker compose build jupyter</code> y recrea con <code>up</code>.</li>
+<li><strong>Arquitectura x86_64:</strong> revisa que no hayas quitado <code>platform: linux/arm64</code> ni utilizado una imagen Intel. El stack incluye una comprobación explícita de arquitectura.</li>
+<li><strong>Sin recursos / OOMKilled:</strong> cierra otras aplicaciones o cambia al perfil <code>spark-single</code>. Deja margen de memoria para Docker y macOS.</li>
+<li><strong>La prueba espera:</strong> termina las otras sesiones Spark. Comprueba los workers ALIVE y que <code>--workers</code> coincide con el perfil.</li>
+<li><strong>No aparece 4040:</strong> crea primero una SparkSession; desaparece al ejecutar <code>spark.stop()</code>.</li>
+</ul>
+<h2 id="validacion-y-procedencia">Validación y procedencia</h2>
+<p>Consulta <a href="VALIDACION.txt">VALIDACION.txt</a> para distinguir las comprobaciones realizadas aquí de la prueba que debes ejecutar en tu Mac. El proyecto original está en https://github.com/iesataulfoargentasor/spark-cluster-docker-sbd (base b0b2f0bf0c1f5238a4d3cc527603539420bc12de). Se conserva su licencia MIT.</p>
+<p>Fuentes oficiales: <a href="https://docs.docker.com/desktop/setup/install/mac-install/">instalación de Docker en Mac</a> y <a href="https://docs.docker.com/desktop/settings-and-maintenance/settings/">configuración de recursos</a>. Los 12 GB/6 CPU son el dimensionamiento propuesto para esta práctica, no un requisito universal de Docker.</p>
+<h2 id="actualizar-una-copia-existente">Actualizar una copia existente</h2>
+<p>Si ya lo clonaste y hay cambios publicados, guarda tu cuaderno, detén el stack y ejecuta:</p>
+<pre><code class="language-bash">docker compose --profile &quot;*&quot; stop
+git pull --ff-only
+bash preparar.sh
+docker compose --profile spark up -d --wait --wait-timeout 300
+</code></pre>
+<p>Si acabas de clonarlo, ya tienes la última versión y no necesitas hacer este paso.
+Si lo descargaste como ZIP, descarga el ZIP nuevo en otra carpeta y conserva tus cuadernos
+antes de trasladarlos. La actualización no requiere borrar datos de Docker.</p><footer>Guía específica para MacBook Air M4 con 24 GB. Licencia MIT. <a href="VALIDACION.txt">Alcance de la validación</a>.</footer></main></body></html>

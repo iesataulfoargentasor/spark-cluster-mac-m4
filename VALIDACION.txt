@@ -1,0 +1,38 @@
+SPARK PARA MACBOOK AIR M4 (24 GB) — 28/10/2026
+
+COMPROBADO
+- La imagen oficial spark:4.0.1-scala2.13-java17-python3-ubuntu dispone de
+  manifiesto linux/arm64/v8 en Docker Hub.
+- Digest del índice multiplataforma fijado en el Dockerfile:
+  sha256:a552a335e0aedb44fa28b20ed7e9dc52c2e856faf87fb0409fb57dbf37b45bf7
+- Digest ARM64 publicado:
+  sha256:08ea8f03ddfc5e468b459e113c1823e7871656c9f2f9675c3498890b3ea0e138
+- Los perfiles spark y spark-single pasan docker compose config.
+- Los servicios declaran linux/arm64 y comparten imagen, versión de Python y carpeta.
+- La sintaxis de preparar.sh se comprueba con bash -n.
+- El cuaderno se entrega sin resultados previos, para ejecutarlo en el Mac.
+
+PENDIENTE EN EL MAC
+No se ha construido ni ejecutado esta adaptación en hardware Apple M4.
+El equipo disponible para prepararla es Windows/amd64. Un intento de construir
+una variante de comprobación amd64 tampoco pudo comenzar porque Docker Desktop
+volvió a devolver Internal Server Error. No se presenta ese intento como exitoso.
+
+La disponibilidad del manifiesto ARM64 y una configuración válida no equivalen
+a una prueba completa de la imagen, los permisos de macOS o los executors.
+
+PRUEBA DE ACEPTACIÓN EN TU MAC
+1. Configurar Docker Desktop para Apple Silicon: 12 GB de memoria y 6 CPU.
+2. En la carpeta del proyecto: bash preparar.sh
+3. docker compose --profile spark up -d --wait --wait-timeout 300
+4. docker compose exec -T jupyter python /workspace/comprobar_cluster.py --workers 2
+5. Debe indicar OK, arquitectura aarch64, dos hosts de executor y ventas ES=30/FR=12.
+6. Abrir Jupyter, guardar una copia del cuaderno y ejecutar todas sus celdas.
+7. Ejecutar spark.stop(), cerrar el kernel y retirar los contenedores con down.
+8. Arrancar otra vez y comprobar que el cuaderno y los resultados permanecen.
+9. Si se usa spark-single, retirar antes el perfil completo y repetir la prueba
+   con --workers 1.
+
+El argumento --expected-arch x86_64 del comprobador sólo sirve para pruebas
+técnicas en otra arquitectura. En el Mac no debe utilizarse: el valor predeterminado
+aarch64 verifica que el driver y los executors ejecutan Python ARM64.
